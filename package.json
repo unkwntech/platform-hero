@@ -17,6 +17,7 @@
         "prepare": "husky install"
     },
     "dependencies": {
+        "@pixi/gif": "^3.0.0",
         "dotenv": "^16.4.5",
         "mongodb": "^6.5.0",
         "pixi.js": "^8.0.5",
@@ -25,13 +26,13 @@
         "typescript": "^5.4.4"
     },
     "devDependencies": {
-        "@types/pixi.js": "^5.0.0",
-        "@types/typescript": "^2.0.0",
         "@babel/core": "7.23.6",
         "@babel/preset-env": "7.23.6",
         "@babel/runtime": "7.23.6",
         "@types/node": "^20.10.5",
         "@types/offscreencanvas": "^2019.7.3",
+        "@types/pixi.js": "^5.0.0",
+        "@types/typescript": "^2.0.0",
         "@typescript-eslint/eslint-plugin": "^6.16.0",
         "@typescript-eslint/parser": "^6.16.0",
         "babel-loader": "9.1.3",

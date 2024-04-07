@@ -1,50 +1,64 @@
-import { AnimatedSprite, Assets, FrameObject, Texture } from "pixi.js";
+import axios, { AxiosResponse } from "axios";
+import { AnimatedSprite, Assets, Texture } from "pixi.js";
 
 export class Character extends AnimatedSprite {
     public State: CharacterStates = CharacterStates.Idle;
     public Animations: { [key: string]: Texture[] } = {};
 
-    private currentAnimationName: string = "";
+    private currentAnimationName: CharacterStates = CharacterStates.None;
+    private _framesSinceLastAnimationChange: number = 0;
+    private _framesRemainingInAnimation: number = 0;
 
     public constructor(
-        textures: Texture[] | FrameObject[],
+        state: CharacterStates = CharacterStates.None,
+        animations: { [key: string]: Texture[] },
         autoUpdate: boolean = true
     ) {
-        super(textures, autoUpdate);
+        super(animations[state], autoUpdate);
+        this.Animations = animations;
+        //this.textures = animations[state];
+
+        this.onFrameChange = (currentFrame: number) => {
+            this._framesSinceLastAnimationChange++;
+            this._framesRemainingInAnimation--;
+        };
     }
 
-    public static async fromJSON(texture: string): Promise<Character> {
-        const json = require("/assets/catset/spritesheets/cat01.json");
+    public static async fromJSON(
+        texture: string,
+        initialState: CharacterStates
+    ): Promise<Character> {
+        //const json = require(texture);
+        return await axios.get(texture).then(async (results: AxiosResponse) => {
+            const json = results.data;
+            const animations: { [key: string]: Texture[] } = { none: [] };
 
-        const idle = await Assets.load(json.idle);
+            for (let [key, path] of Object.entries(json)) {
+                animations[key] = Object.values(
+                    (await Assets.load(path as string)).textures
+                ) as Texture[];
+            }
 
-        const char = new Character(Object.values(idle.textures) as Texture[]);
+            return new Character(initialState, animations);
+        });
+    }
 
-        for (let [key, path] of Object.entries(json)) {
-            char.Animations[key] = Object.values(
-                (await Assets.load(path as string)).textures
-            ) as Texture[];
+    public get FramesRemainingInAnimation() {
+        return this._framesRemainingInAnimation;
+    }
+
+    public SetAnimation(name: CharacterStates) {
+        if (!this.Animations[name] || this.Animations[name].length < 1) {
+            //how to fail gracefully?
+            console.error(`INVALID STATE, NO ANIMATION PRESENT FOR ${name}`);
+            return;
         }
 
-        return char;
+        this.currentAnimationName = name;
+        this._framesSinceLastAnimationChange = 0;
+        this._framesRemainingInAnimation = this.Animations[name].length;
+        this.textures = this.Animations[name];
     }
-    // // Play the spine animation.
-    // playAnimation(state: CharacterStates, loop = false) {
-    //     // Skip if the animation is already playing.
-    //     if (this.currentAnimationName === state) return;
-    //     debugger;
-    //     // Play the animation on main track instantly.
-    //     this.textures = this.Animations[state];
-
-    //     // Apply the animation's time scale (speed).
-    //     //trackEntry.timeScale = 1;
-    // }
-    // public update() {
-    //     if (this.State == CharacterStates.Running)
-    //         this.textures = this.Animations[CharacterStates.Running];
-
-    //     this.playAnimation(this.State);
-    // }
 }
 
 export enum CharacterStates {
@@ -54,4 +68,5 @@ export enum CharacterStates {
     Idle = "idle",
     Death = "death",
     Falling = "falling",
+    None = "none",
 }

@@ -1,0 +1,4 @@
+{
+    "idle": "assets/default_stickman/default_stickman_idle.json",
+    "walking": "assets/default_stickman/default_stickman_walk.json"
+}

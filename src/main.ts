@@ -1,121 +1,179 @@
-import "@pixi/gif";
-import { Application, Container } from "pixi.js";
-import { Character, CharacterStates } from "./character";
-import { Controller } from "./controller";
+import Phaser from "phaser";
 
-(async () => {
-    const app = new Application();
+var config = {
+    type: Phaser.AUTO,
+    width: 800,
+    height: 600,
+    physics: {
+        default: "arcade",
+        arcade: {
+            gravity: { y: 300, x: 0 },
+            debug: false,
+        },
+    },
+    scene: {
+        preload: preload,
+        create: create,
+        update: update,
+    },
+};
 
-    await app.init({
-        background: "#660044",
-        resizeTo: document.getElementsByTagName("body")[0],
+var player: any;
+var stars: any;
+var bombs: any;
+var platforms: any;
+var cursors: any;
+var score = 0;
+var gameOver = false;
+var scoreText: any;
+
+var game = new Phaser.Game(config);
+
+function preload() {
+    this.load.image("sky", "assets/sky.png");
+    this.load.image("ground", "assets/platform.png");
+    this.load.image("star", "assets/star.png");
+    this.load.image("bomb", "assets/bomb.png");
+    this.load.spritesheet("dude", "assets/dude.png", {
+        frameWidth: 32,
+        frameHeight: 48,
     });
-
-    document.body.appendChild(app.canvas);
-
-    //#region load character
-
-    const controller = new Controller();
-
-    let char = await Character.fromJSON(
-        //"http://localhost:8080/assets/catset/spritesheets/cat01.json",
-        "http://localhost:8080/assets/default_stickman/default_stickman.json",
-        CharacterStates.Idle
-    );
-
-    char.animationSpeed = 0.1666;
-    char.play();
-    char.anchor.set(0.5, 0.5);
-    char.scale = 1;
-    char.rotation = 0;
-    char.x = app.screen.width / 2;
-    char.y = app.screen.height / 2;
-    app.stage.addChild(char);
-
-    //#endregion
-
-    app.ticker.add((t) => {
-        console.log(controller.keys);
-        let s = char.State;
-
-        if (
-            s === CharacterStates.Jumping &&
-            char.FramesRemainingInAnimation >= 0
-        ) {
-            console.log("STILL JUMPING");
-            return;
-        }
-
-        // Update character's state based on the controller's input.
-        if (controller.keys.left.pressed || controller.keys.right.pressed)
-            char.State = CharacterStates.Walking;
-        else if (
-            controller.keys.left.doubleTap ||
-            controller.keys.right.doubleTap
-        )
-            char.State = CharacterStates.Running;
-        else if (controller.keys.space.pressed)
-            char.State = CharacterStates.Jumping;
-        else char.State = CharacterStates.Idle;
-
-        console.log(char.State);
-
-        if (s != char.State) {
-            console.log("STATE CHANGE");
-            //cat.textures = cat.Animations[cat.State];
-            char.SetAnimation(char.State);
-            char.play();
-        }
-    });
-})();
-
-// Test For Hit
-// A basic AABB check between two different squares
-function testForAABB<T extends Container>(object1: T, object2: T) {
-    const bounds1 = object1.getBounds();
-    const bounds2 = object2.getBounds();
-
-    return (
-        bounds1.x < bounds2.x + bounds2.width &&
-        bounds1.x + bounds1.width > bounds2.x &&
-        bounds1.y < bounds2.y + bounds2.height &&
-        bounds1.y + bounds1.height > bounds2.y
-    );
 }
 
-// Calculates the results of a collision, allowing us to give an impulse that
-// shoves objects apart
-function collisionResponse<T extends Container>(object1: T, object2: T) {
-    // if (!object1 || !object2) {
-    //     return new Point(0);
-    // }
-    // const vCollision = new Point(object2.x - object1.x, object2.y - object1.y);
-    // const distance = Math.sqrt(
-    //     (object2.x - object1.x) * (object2.x - object1.x) +
-    //         (object2.y - object1.y) * (object2.y - object1.y)
-    // );
-    // const vCollisionNorm = new Point(
-    //     vCollision.x / distance,
-    //     vCollision.y / distance
-    // );
-    // const vRelativeVelocity = new Point(
-    //     object1.acceleration.x - object2.acceleration.x,
-    //     object1.acceleration.y - object2.acceleration.y
-    // );
-    // const speed =
-    //     vRelativeVelocity.x * vCollisionNorm.x +
-    //     vRelativeVelocity.y * vCollisionNorm.y;
-    // const impulse = (impulsePower * speed) / (object1.mass + object2.mass);
-    // return new Point(impulse * vCollisionNorm.x, impulse * vCollisionNorm.y);
+function create() {
+    //  A simple background for our game
+    game.scene.add.image(400, 300, "sky");
+
+    //  The platforms group contains the ground and the 2 ledges we can jump on
+    platforms = this.physics.add.staticGroup();
+
+    //  Here we create the ground.
+    //  Scale it to fit the width of the game (the original sprite is 400x32 in size)
+    platforms.create(400, 568, "ground").setScale(2).refreshBody();
+
+    //  Now let's create some ledges
+    platforms.create(600, 400, "ground");
+    platforms.create(50, 250, "ground");
+    platforms.create(750, 220, "ground");
+
+    // The player and its settings
+    player = this.physics.add.sprite(100, 450, "dude");
+
+    //  Player physics properties. Give the little guy a slight bounce.
+    player.setBounce(0.2);
+    player.setCollideWorldBounds(true);
+
+    //  Our player animations, turning, walking left and walking right.
+    this.anims.create({
+        key: "left",
+        frames: this.anims.generateFrameNumbers("dude", { start: 0, end: 3 }),
+        frameRate: 10,
+        repeat: -1,
+    });
+
+    this.anims.create({
+        key: "turn",
+        frames: [{ key: "dude", frame: 4 }],
+        frameRate: 20,
+    });
+
+    this.anims.create({
+        key: "right",
+        frames: this.anims.generateFrameNumbers("dude", { start: 5, end: 8 }),
+        frameRate: 10,
+        repeat: -1,
+    });
+
+    //  Input Events
+    cursors = this.input.keyboard.createCursorKeys();
+
+    //  Some stars to collect, 12 in total, evenly spaced 70 pixels apart along the x axis
+    stars = this.physics.add.group({
+        key: "star",
+        repeat: 11,
+        setXY: { x: 12, y: 0, stepX: 70 },
+    });
+
+    stars.children.iterate(function (child) {
+        //  Give each star a slightly different bounce
+        child.setBounceY(Phaser.Math.FloatBetween(0.4, 0.8));
+    });
+
+    bombs = this.physics.add.group();
+
+    //  The score
+    scoreText = this.add.text(16, 16, "score: 0", {
+        fontSize: "32px",
+        fill: "#000",
+    });
+
+    //  Collide the player and the stars with the platforms
+    this.physics.add.collider(player, platforms);
+    this.physics.add.collider(stars, platforms);
+    this.physics.add.collider(bombs, platforms);
+
+    //  Checks to see if the player overlaps with any of the stars, if he does call the collectStar function
+    this.physics.add.overlap(player, stars, collectStar, null, this);
+
+    this.physics.add.collider(player, bombs, hitBomb, null, this);
 }
 
-// Calculate the distance between two given points
-function distanceBetweenTwoPoints<T extends { x: number; y: number }>(
-    p1: T,
-    p2: T
-) {
-    const a = p1.x - p2.x;
-    const b = p1.y - p2.y;
+function update() {
+    if (gameOver) {
+        return;
+    }
 
-    return Math.hypot(a, b);
+    if (cursors.left.isDown) {
+        player.setVelocityX(-160);
+
+        player.anims.play("left", true);
+    } else if (cursors.right.isDown) {
+        player.setVelocityX(160);
+
+        player.anims.play("right", true);
+    } else {
+        player.setVelocityX(0);
+
+        player.anims.play("turn");
+    }
+
+    if (cursors.up.isDown && player.body.touching.down) {
+        player.setVelocityY(-330);
+    }
+}
+
+function collectStar(player, star) {
+    star.disableBody(true, true);
+
+    //  Add and update the score
+    score += 10;
+    scoreText.setText("Score: " + score);
+
+    if (stars.countActive(true) === 0) {
+        //  A new batch of stars to collect
+        stars.children.iterate(function (child) {
+            child.enableBody(true, child.x, 0, true, true);
+        });
+
+        var x =
+            player.x < 400
+                ? Phaser.Math.Between(400, 800)
+                : Phaser.Math.Between(0, 400);
+
+        var bomb = bombs.create(x, 16, "bomb");
+        bomb.setBounce(1);
+        bomb.setCollideWorldBounds(true);
+        bomb.setVelocity(Phaser.Math.Between(-200, 200), 20);
+        bomb.allowGravity = false;
+    }
+}
+
+function hitBomb(player, bomb) {
+    this.physics.pause();
+
+    player.setTint(0xff0000);
+
+    player.anims.play("turn");
+
+    gameOver = true;
 }

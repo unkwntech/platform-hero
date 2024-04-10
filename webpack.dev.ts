@@ -2,7 +2,7 @@ import fs from "fs";
 import * as path from "path";
 import * as webpack from "webpack";
 
-import ESLintPlugin from "eslint-webpack-plugin";
+//import ESLintPlugin from "eslint-webpack-plugin";
 import MiniCssExtractPlugin from "mini-css-extract-plugin";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const pkg = JSON.parse(
@@ -45,13 +45,13 @@ module.exports = () => {
                 filename: "[name].css",
             }),
 
-            new ESLintPlugin({
-                extensions: ["js", "jsx", "ts", "tsx"],
-                emitError: true,
-                emitWarning: true,
-                failOnError: false,
-                failOnWarning: false,
-            }),
+            // new ESLintPlugin({
+            //     extensions: ["js", "jsx", "ts", "tsx"],
+            //     emitError: true,
+            //     emitWarning: true,
+            //     failOnError: false,
+            //     failOnWarning: false,
+            // }),
 
             new webpack.DefinePlugin({
                 VERSION: JSON.stringify(pkg.version + "-d"),
